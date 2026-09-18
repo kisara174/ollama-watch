@@ -1,5 +1,7 @@
 # ollama-watch
 
+[English](README.md) | [简体中文](README_CN.md)
+
 Run an Ollama chat beside live Apple Silicon resource monitoring in one temporary tmux workspace.
 
 `ollama-watch` opens three terminal panes:
@@ -60,7 +62,7 @@ Start a specific installed model:
 
 ```sh
 ollama-watch qwen3.5:9b
-ollama-watch qwen3.5:14b
+ollama-watch deepseek-r1:14b
 ```
 
 The model name must exactly match the first column of `ollama list`. Run `ollama-watch --help` for the command summary.
@@ -118,21 +120,6 @@ From the cloned repository, run:
 ```
 
 The uninstaller removes the installed launcher and only the marked `ollama-watch` block from `.zshrc`. It does not remove Ollama, tmux, macmon, models, or unrelated shell settings.
-
-## 中文说明
-
-`ollama-watch` 会在临时 tmux 会话中同时显示 Ollama 对话、macmon 的 CPU/GPU/统一内存状态，以及每两秒刷新的 `ollama ps`。
-
-安装依赖与默认模型：
-
-```sh
-brew install ollama tmux macmon
-ollama pull qwen3.5:9b
-```
-
-然后克隆本仓库并运行 `./install.sh`。使用 `ollama-watch` 启动默认 9B 模型，或用 `ollama-watch qwen3.5:14b` 指定其他已安装模型。退出 Ollama 后，当前监控会话会自动清理。
-
-卸载请在仓库目录运行 `./uninstall.sh`；它只删除本工具和自己写入的 PATH 配置块。
 
 ## License
 
