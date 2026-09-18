@@ -45,4 +45,3 @@ case ":$PATH:" in
 esac
 
 printf 'Installed ollama-watch to %s\n' "$DESTINATION"
-
