@@ -3,6 +3,8 @@ set -u
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 LAUNCHER="$ROOT_DIR/bin/ollama-watch"
+INSTALLER="$ROOT_DIR/install.sh"
+UNINSTALLER="$ROOT_DIR/uninstall.sh"
 TEST_TMP=$(mktemp -d "${TMPDIR:-/tmp}/ollama-watch-tests.XXXXXX")
 STUB_BIN="$TEST_TMP/bin"
 CALL_LOG="$TEST_TMP/calls.log"
@@ -102,6 +104,40 @@ assert_log_contains() {
     fi
 }
 
+assert_equals() {
+    description=$1
+    expected=$2
+    actual=$3
+    if [ "$actual" = "$expected" ]; then
+        pass "$description"
+    else
+        fail "$description"
+        printf '  expected: %s\n  actual: %s\n' "$expected" "$actual" >&2
+    fi
+}
+
+assert_executable() {
+    description=$1
+    path=$2
+    if [ -x "$path" ]; then
+        pass "$description"
+    else
+        fail "$description"
+        printf '  expected executable: %s\n' "$path" >&2
+    fi
+}
+
+assert_absent() {
+    description=$1
+    path=$2
+    if [ ! -e "$path" ]; then
+        pass "$description"
+    else
+        fail "$description"
+        printf '  expected path to be absent: %s\n' "$path" >&2
+    fi
+}
+
 help_output=$($LAUNCHER --help 2>&1)
 assert_contains 'help documents the command' 'Usage: ollama-watch [model]' "$help_output"
 
@@ -115,6 +151,27 @@ assert_log_contains 'layout creates a right column' 'tmux split-window -h -p 35'
 assert_log_contains 'resource pane starts macmon' 'macmon'
 assert_log_contains 'status pane polls ollama ps' 'ollama ps'
 assert_log_contains 'outside tmux the session is attached' 'tmux attach-session -t ollama-watch-'
+
+TEST_HOME="$TEST_TMP/home"
+INSTALL_DIR="$TEST_HOME/.local/bin"
+mkdir -p "$TEST_HOME"
+printf '%s\n' 'export KEEP_THIS_LINE=1' > "$TEST_HOME/.zshrc"
+
+assert_status 'first install succeeds' 0 env HOME="$TEST_HOME" OLLAMA_WATCH_INSTALL_DIR="$INSTALL_DIR" "$INSTALLER"
+assert_status 'second install is idempotent' 0 env HOME="$TEST_HOME" OLLAMA_WATCH_INSTALL_DIR="$INSTALL_DIR" "$INSTALLER"
+assert_executable 'installer creates an executable launcher' "$INSTALL_DIR/ollama-watch"
+marker_count=$(grep -c '^# >>> ollama-watch >>>$' "$TEST_HOME/.zshrc" 2>/dev/null || true)
+assert_equals 'installer writes one PATH block' 1 "$marker_count"
+preserved_count=$(grep -c '^export KEEP_THIS_LINE=1$' "$TEST_HOME/.zshrc" 2>/dev/null || true)
+assert_equals 'installer preserves existing zsh configuration' 1 "$preserved_count"
+
+assert_status 'first uninstall succeeds' 0 env HOME="$TEST_HOME" OLLAMA_WATCH_INSTALL_DIR="$INSTALL_DIR" "$UNINSTALLER"
+assert_status 'second uninstall is idempotent' 0 env HOME="$TEST_HOME" OLLAMA_WATCH_INSTALL_DIR="$INSTALL_DIR" "$UNINSTALLER"
+assert_absent 'uninstaller removes only the installed launcher' "$INSTALL_DIR/ollama-watch"
+marker_count=$(grep -c '^# >>> ollama-watch >>>$' "$TEST_HOME/.zshrc" 2>/dev/null || true)
+assert_equals 'uninstaller removes the managed PATH block' 0 "$marker_count"
+preserved_count=$(grep -c '^export KEEP_THIS_LINE=1$' "$TEST_HOME/.zshrc" 2>/dev/null || true)
+assert_equals 'uninstaller preserves unrelated zsh configuration' 1 "$preserved_count"
 
 if [ "$FAILURES" -ne 0 ]; then
     printf '%s of %s tests failed\n' "$FAILURES" "$TESTS" >&2
